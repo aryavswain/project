@@ -6,7 +6,7 @@ import time
 from groq import Groq
 
 # --- Hardcoded Groq API Key ---
-GROQ_API_KEY = "gsk_yOuRaPiKeYhErE"
+client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
 # --- Page Config ---
 st.set_page_config(page_title="MarsNet-RL | Autonomous Routing", layout="wide")
