@@ -71,6 +71,15 @@ col1.metric("Live Collision Risk", "0.02%", "-0.4% from baseline")
 col2.metric("Network Coverage", "94.2%", "Target: 90%")
 col3.metric("Agent Success Rate", "88.5%", "Stage 2 Phase")
 
+# Helper to calculate position vectors
+def get_coords(r, anomaly, lan, inc):
+    x_p = r * np.cos(anomaly)
+    y_p = r * np.sin(anomaly)
+    x_s = x_p * np.cos(lan) - y_p * np.sin(lan) * np.cos(inc)
+    y_s = x_p * np.sin(lan) + y_p * np.cos(lan) * np.cos(inc)
+    z_s = y_p * np.sin(inc)
+    return x_s, y_s, z_s
+
 # --- 3D Visualization Generator Function ---
 def build_animated_orbital_plot():
     R_mars = 3389.5  
@@ -108,15 +117,6 @@ def build_animated_orbital_plot():
     # Trace 0: Mars
     fig.add_trace(go.Surface(x=x_m, y=y_m, z=z_m, colorscale='balance', showscale=False, name="Mars", opacity=0.9))
 
-    # Helper to calculate position vectors
-    def get_coords(r, anomaly, lan, inc):
-        x_p = r * np.cos(anomaly)
-        y_p = r * np.sin(anomaly)
-        x_s = x_p * np.cos(lan) - y_p * np.sin(lan) * np.cos(inc)
-        y_s = x_p * np.sin(lan) + y_p * np.cos(lan) * np.cos(inc)
-        z_s = y_p * np.sin(inc)
-        return x_s, y_s, z_s
-
     # Generate all positions for frames
     frames = []
     num_frames = 40
@@ -152,7 +152,6 @@ def build_animated_orbital_plot():
 
         # Build frame update payload
         if t == 0:
-            # Inject base interactive layouts
             fig.add_trace(go.Surface(x=x_e, y=y_e, z=z_e, colorscale='Blues', showscale=False, name="Earth", opacity=0.85))
             fig.add_trace(go.Scatter3d(x=a_x, y=a_y, z=a_z, mode='markers', marker=dict(size=2.5, color='darkgray'), name="Asteroids", hoverinfo='none'))
             fig.add_trace(go.Scatter3d(x=s_x, y=s_y, z=s_z, mode='markers', marker=dict(size=5, color='gold', symbol='diamond'), name="Satellites", text=s_hover, hoverinfo="text"))
@@ -169,9 +168,8 @@ def build_animated_orbital_plot():
 
     fig.frames = frames
 
-    # Setup clean internal layout playback configurations
     fig.update_layout(
-        margin=dict(l=10, r=10, b=10, t=10), # Added small padding inside canvas boundary
+        margin=dict(l=10, r=10, b=10, t=10),
         height=600,
         paper_bgcolor='black',
         scene=dict(
@@ -183,14 +181,14 @@ def build_animated_orbital_plot():
         updatemenus=[{
             "type": "buttons",
             "showactive": False,
-            "x": 0.05,       # Anchor explicitly inside left margin
-            "y": 0.05,       # Lift above bottom boundary so it never spills over or crops content
+            "x": 0.05,       
+            "y": 0.05,       
             "xanchor": "left",
             "yanchor": "bottom",
             "pad": {"t": 10, "b": 10},
-            "font": {"color": "gold", "size": 13}, # Bright gold text for maximum dark-mode visibility
-            "bgcolor": "#1e1e1e",                  # Deep charcoal button block base
-            "bordercolor": "gold",                 # Explicit matching border lines
+            "font": {"color": "gold", "size": 13}, 
+            "bgcolor": "#1e1e1e",                  
+            "bordercolor": "gold",                 
             "borderwidth": 1,
             "buttons": [{
                 "label": "▶ Animate Real-World Dynamics",
@@ -206,12 +204,12 @@ def build_animated_orbital_plot():
             font=dict(color="white")
         )
     )
-    return fig, v_orbit_kms
+    return fig, v_orbit_kms, r_orbit, sat_lan, sat_inc, omega
 
 # --- 3D Visualization Pipeline UI ---
 st.subheader("Real-World Martian Orbital Dynamics Visualization")
 
-animated_fig, current_velocity = build_animated_orbital_plot()
+animated_fig, current_velocity, r_orbit, sat_lan, sat_inc, omega = build_animated_orbital_plot()
 st.markdown(f"🛰️ **Current Orbital Velocity:** `{current_velocity:.3f} km/s` *(Passive Keplerian drift)*")
 st.plotly_chart(animated_fig, use_container_width=True)
 
@@ -228,12 +226,42 @@ with tab1:
             status.update(label="System Stable: Autonomous avoidance active", state="complete")
 
     st.write("Current Orbital Metrics")
+    
+    # --- Dynamic Metrics Engine Engine (Evaluates Real Satellite Distances) ---
+    collision_array = np.zeros(num_satellites, dtype=int)
+    np.random.seed(42) # Mirror simulation properties
+    
+    # Calculate physical positions at a test window (t=10) to search for tight spacing overlaps
+    positions = []
+    for i in range(num_satellites):
+        ma = (2 * np.pi / num_satellites) * i + (omega * 10)
+        x, y, z = get_coords(r_orbit, ma, sat_lan[i], sat_inc[i])
+        positions.append(np.array([x, y, z]))
+        
+    # Check if they brush past or touch within a spatial tolerance of 10km
+    proximity_tolerance = 10.0 
+    for i in range(num_satellites):
+        for j in range(i + 1, num_satellites):
+            dist = np.linalg.norm(positions[i] - positions[j])
+            if dist < proximity_tolerance:
+                collision_array[i] += 1
+                collision_array[j] += 1
+
+    # Deterministic generation for secondary telemetry arrays matching the exact slider count
+    np.random.seed(24)
+    fuel_usage = np.round(np.random.uniform(0.0, 3.5, size=num_satellites), 2)
+    uptime_percentage = np.round(np.random.uniform(94.0, 99.9, size=num_satellites), 1)
+    sat_labels = [f"Satellite {k}" for k in range(num_satellites)]
+
     telemetry_data = {
-        "Collision Events": [0, 0, 1, 0, 0], 
-        "Fuel Usage (kg)": [1.2, 0.4, 3.1, 0.0, 0.8],  
-        "Uptime (%)": [98.2, 99.5, 94.1, 99.9, 97.6]     
+        "Collision Events": collision_array, 
+        "Fuel Usage (kg)": fuel_usage,  
+        "Uptime (%)": uptime_percentage     
     }
-    st.dataframe(pd.DataFrame(telemetry_data), use_container_width=True)
+    
+    # Constructing DataFrame scaled seamlessly to match the user's sidebar selection
+    df_metrics = pd.DataFrame(telemetry_data, index=sat_labels)
+    st.dataframe(df_metrics, use_container_width=True)
 
 with tab2:
     st.subheader("RL Reward Function Monitoring")
