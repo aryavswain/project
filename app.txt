@@ -1,0 +1,2 @@
+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
+client = Groq(api_key=st.secrets["GROQ_API_KEY"])
