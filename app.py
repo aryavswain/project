@@ -12,7 +12,6 @@ client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 st.set_page_config(page_title="MarsNet-RL | Autonomous Routing", layout="wide")
 
 # --- Initialize Groq Client ---
-client = Groq(api_key=GROQ_API_KEY)
 
 # --- Sidebar: Simulation Setup & Chatbot ---
 st.sidebar.title("🚀 MarsNet-RL Control")
