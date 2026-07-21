@@ -217,7 +217,7 @@ def build_animated_orbital_plot():
             "y": 0.09, # Shifted up slightly to arrange perfectly above the timeline text block
             "xanchor": "left",
             "yanchor": "bottom",
-            "pad": {"t": 10, "b": 10},
+            "borderpad": {"t": 10, "b": 10},
             "font": {"color": "gold", "size": 13}, 
             "bgcolor": "#1e1e1e",                  
             "bordercolor": "gold",                 
