@@ -193,7 +193,7 @@ def build_animated_orbital_plot():
                         bgcolor="rgba(30, 30, 30, 0.45)",
                         bordercolor="rgba(255, 255, 255, 0.15)",
                         borderwidth=1,
-                        pad=dict(t=4, b=4, l=6, r=6)
+                        borderpad=dict(t=4, b=4, l=6, r=6)
                     )
                 ])
             ))
@@ -238,7 +238,7 @@ def build_animated_orbital_plot():
                 bgcolor="rgba(30, 30, 30, 0.45)",
                 bordercolor="rgba(255, 255, 255, 0.15)",
                 borderwidth=1,
-                pad=dict(t=4, b=4, l=6, r=6)
+                borderpad=dict(t=4, b=4, l=6, r=6)
             )
         ],
         legend=dict(
