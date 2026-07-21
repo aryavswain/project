@@ -97,12 +97,6 @@ def build_animated_orbital_plot():
     v_orbit_kms = np.sqrt(GM_mars / r_orbit)  
     omega = (v_orbit_kms / r_orbit) * 250  # Time dilation scaling factor
 
-    # Phobos & Deimos Real Orbital Path Scaling Configuration
-    r_phobos = 9376.0
-    r_deimos = 23463.0
-    omega_phobos = (np.sqrt(GM_mars / r_phobos) / r_phobos) * 250
-    omega_deimos = (np.sqrt(GM_mars / r_deimos) / r_deimos) * 250
-
     # Generate Setup Arrays
     np.random.seed(42)
     sat_inc = np.random.uniform(-np.pi/4, np.pi/4, size=num_satellites)
@@ -120,7 +114,7 @@ def build_animated_orbital_plot():
     # Create Base Traces for Frame 0
     fig = go.Figure()
 
-    # Trace 0: Mars Globe Base
+    # Trace 0: Mars
     fig.add_trace(go.Surface(x=x_m, y=y_m, z=z_m, colorscale='balance', showscale=False, name="Mars", opacity=0.9))
 
     # Generate all positions for frames
@@ -156,46 +150,20 @@ def build_animated_orbital_plot():
             a_y.append(y)
             a_z.append(z)
 
-        # 4. Moons (Phobos & Deimos) Positions
-        p_x, p_y, p_z = get_coords(r_phobos, omega_phobos * t, 0.0, 0.019)
-        d_x, d_y, d_z = get_coords(r_deimos, omega_deimos * t, 0.0, 0.010)
-
-        # Text calculations for runtime metric
-        elapsed_mins = int((t * 250) // 60)
-        elapsed_secs = int((t * 250) % 60)
-        time_text = f"⏳ Elapsed: {elapsed_mins}m {elapsed_secs}s"
-
         # Build frame update payload
         if t == 0:
             fig.add_trace(go.Surface(x=x_e, y=y_e, z=z_e, colorscale='Blues', showscale=False, name="Earth", opacity=0.85))
             fig.add_trace(go.Scatter3d(x=a_x, y=a_y, z=a_z, mode='markers', marker=dict(size=2.5, color='darkgray'), name="Asteroids", hoverinfo='none'))
             fig.add_trace(go.Scatter3d(x=s_x, y=s_y, z=s_z, mode='markers', marker=dict(size=5, color='gold', symbol='diamond'), name="Satellites", text=s_hover, hoverinfo="text"))
-            fig.add_trace(go.Scatter3d(x=[p_x], y=[p_y], z=[p_z], mode='markers', marker=dict(size=9, color='#c1a48c', symbol='circle'), name="🌕 Phobos"))
-            fig.add_trace(go.Scatter3d(x=[d_x], y=[d_y], z=[d_z], mode='markers', marker=dict(size=6, color='#e5e5e5', symbol='circle'), name="🌑 Deimos"))
         else:
             frames.append(go.Frame(
                 data=[
                     go.Surface(x=x_m, y=y_m, z=z_m), 
                     go.Surface(x=x_e, y=y_e, z=z_e),
                     go.Scatter3d(x=a_x, y=a_y, z=a_z),
-                    go.Scatter3d(x=s_x, y=s_y, z=s_z, text=s_hover),
-                    go.Scatter3d(x=[p_x], y=[p_y], z=[p_z]),
-                    go.Scatter3d(x=[d_x], y=[d_y], z=[d_z])
+                    go.Scatter3d(x=s_x, y=s_y, z=s_z, text=s_hover)
                 ],
-                name=f"frame_{t}",
-                layout=dict(annotations=[
-                    dict(
-                        x=0.05, y=0.02,
-                        xref="paper", yref="paper",
-                        text=time_text,
-                        showarrow=False,
-                        font=dict(color="rgba(255, 255, 255, 0.65)", size=12),
-                        bgcolor="rgba(30, 30, 30, 0.45)",
-                        bordercolor="rgba(255, 255, 255, 0.15)",
-                        borderwidth=1,
-                        borderpad=dict(t=4, b=4, l=6, r=6)
-                    )
-                ])
+                name=f"frame_{t}"
             ))
 
     fig.frames = frames
@@ -214,10 +182,10 @@ def build_animated_orbital_plot():
             "type": "buttons",
             "showactive": False,
             "x": 0.05,       
-            "y": 0.09, # Shifted up slightly to arrange perfectly above the timeline text block
+            "y": 0.05,       
             "xanchor": "left",
             "yanchor": "bottom",
-            "borderpad": {"t": 10, "b": 10},
+            "pad": {"t": 10, "b": 10},
             "font": {"color": "gold", "size": 13}, 
             "bgcolor": "#1e1e1e",                  
             "bordercolor": "gold",                 
@@ -228,19 +196,6 @@ def build_animated_orbital_plot():
                 "args": [None, {"frame": {"duration": 40, "redraw": True}, "fromcurrent": True, "transition": {"duration": 0}}]
             }]
         }],
-        annotations=[
-            dict(
-                x=0.05, y=0.02,
-                xref="paper", yref="paper",
-                text="⏳ Elapsed: 0m 0s",
-                showarrow=False,
-                font=dict(color="rgba(255, 255, 255, 0.65)", size=12),
-                bgcolor="rgba(30, 30, 30, 0.45)",
-                bordercolor="rgba(255, 255, 255, 0.15)",
-                borderwidth=1,
-                borderpad=dict(t=4, b=4, l=6, r=6)
-            )
-        ],
         legend=dict(
             x=0.05,
             y=0.95,
@@ -272,15 +227,18 @@ with tab1:
 
     st.write("Current Orbital Metrics")
     
+    # --- Dynamic Metrics Engine Engine (Evaluates Real Satellite Distances) ---
     collision_array = np.zeros(num_satellites, dtype=int)
-    np.random.seed(42)
+    np.random.seed(42) # Mirror simulation properties
     
+    # Calculate physical positions at a test window (t=10) to search for tight spacing overlaps
     positions = []
     for i in range(num_satellites):
         ma = (2 * np.pi / num_satellites) * i + (omega * 10)
         x, y, z = get_coords(r_orbit, ma, sat_lan[i], sat_inc[i])
         positions.append(np.array([x, y, z]))
         
+    # Check if they brush past or touch within a spatial tolerance of 10km
     proximity_tolerance = 10.0 
     for i in range(num_satellites):
         for j in range(i + 1, num_satellites):
@@ -289,6 +247,7 @@ with tab1:
                 collision_array[i] += 1
                 collision_array[j] += 1
 
+    # Deterministic generation for secondary telemetry arrays matching the exact slider count
     np.random.seed(24)
     fuel_usage = np.round(np.random.uniform(0.0, 3.5, size=num_satellites), 2)
     uptime_percentage = np.round(np.random.uniform(94.0, 99.9, size=num_satellites), 1)
@@ -300,6 +259,7 @@ with tab1:
         "Uptime (%)": uptime_percentage     
     }
     
+    # Constructing DataFrame scaled seamlessly to match the user's sidebar selection
     df_metrics = pd.DataFrame(telemetry_data, index=sat_labels)
     st.dataframe(df_metrics, use_container_width=True)
 
