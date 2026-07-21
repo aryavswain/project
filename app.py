@@ -11,11 +11,16 @@ client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 # --- Page Config ---
 st.set_page_config(page_title="MarsNet-RL | Autonomous Routing", layout="wide")
 
+# --- Initialize Persistent Simulation States ---
+if "routing_initialized" not in st.session_state:
+    st.session_state.routing_initialized = False
+
 # --- Sidebar: Simulation Setup & Chatbot ---
 st.sidebar.title("🚀 MarsNet-RL Control")
 st.sidebar.info("Version 1.0 | Team Cassiopeia")
 
 num_satellites = st.sidebar.slider("Number of Satellites", 5, 50, 20)
+sat_mass = st.sidebar.slider("Satellite Mass (kg)", 20, 1000, 200)
 debris_density = st.sidebar.slider("Debris Density", 0.0, 1.0, 0.3)
 training_mode = st.sidebar.checkbox("Enable Training Mode (RL Active)")
 
@@ -128,16 +133,7 @@ def build_animated_orbital_plot():
     num_frames = 40
     
     for t in range(num_frames):
-        # 1. Earth Position
-        earth_orbit_r = 22000
-        e_angle = 0.01 * t
-        x_e_c = earth_orbit_r * np.cos(e_angle)
-        y_e_c = earth_orbit_r * np.sin(e_angle)
-        x_e = x_e_c + 4000 * np.outer(np.cos(u), np.sin(v))
-        y_e = y_e_c + 4000 * np.outer(np.sin(u), np.sin(v))
-        z_e = 0 + 4000 * np.outer(np.ones(np.size(u)), np.cos(v))
-
-        # 2. Satellites
+        # 1. Satellites
         s_x, s_y, s_z, s_hover = [], [], [], []
         for i in range(num_satellites):
             ma = (2 * np.pi / num_satellites) * i + (omega * t)
@@ -147,7 +143,7 @@ def build_animated_orbital_plot():
             s_z.append(z)
             s_hover.append(f"🛰️ Sat {i+1}<br>Velocity: {v_orbit_kms:.3f} km/s")
 
-        # 3. Asteroids
+        # 2. Asteroids
         a_x, a_y, a_z = [], [], []
         for j in range(num_asteroids):
             aa = ast_phase[j] + (ast_omega[j] * t)
@@ -156,7 +152,7 @@ def build_animated_orbital_plot():
             a_y.append(y)
             a_z.append(z)
 
-        # 4. Moons (Phobos & Deimos) Positions
+        # 3. Moons (Phobos & Deimos) Positions
         p_x, p_y, p_z = get_coords(r_phobos, omega_phobos * t, 0.0, 0.019)
         d_x, d_y, d_z = get_coords(r_deimos, omega_deimos * t, 0.0, 0.010)
 
@@ -167,7 +163,6 @@ def build_animated_orbital_plot():
 
         # Build frame update payload
         if t == 0:
-            fig.add_trace(go.Surface(x=x_e, y=y_e, z=z_e, colorscale='Blues', showscale=False, name="Earth", opacity=0.85))
             fig.add_trace(go.Scatter3d(x=a_x, y=a_y, z=a_z, mode='markers', marker=dict(size=2.5, color='darkgray'), name="Asteroids", hoverinfo='none'))
             fig.add_trace(go.Scatter3d(x=s_x, y=s_y, z=s_z, mode='markers', marker=dict(size=5, color='gold', symbol='diamond'), name="Satellites", text=s_hover, hoverinfo="text"))
             fig.add_trace(go.Scatter3d(x=[p_x], y=[p_y], z=[p_z], mode='markers', marker=dict(size=9, color='#c1a48c', symbol='circle'), name="🌕 Phobos"))
@@ -176,14 +171,13 @@ def build_animated_orbital_plot():
             frames.append(go.Frame(
                 data=[
                     go.Surface(x=x_m, y=y_m, z=z_m), 
-                    go.Surface(x=x_e, y=y_e, z=z_e),
                     go.Scatter3d(x=a_x, y=a_y, z=a_z),
                     go.Scatter3d(x=s_x, y=s_y, z=s_z, text=s_hover),
                     go.Scatter3d(x=[p_x], y=[p_y], z=[p_z]),
                     go.Scatter3d(x=[d_x], y=[d_y], z=[d_z])
                 ],
                 name=f"frame_{t}",
-                layout=dict(title=dict(text=time_text)) # Fixed: Safe title updates prevent layout value errors
+                layout=dict(title=dict(text=time_text))
             ))
 
     fig.frames = frames
@@ -202,7 +196,7 @@ def build_animated_orbital_plot():
             "type": "buttons",
             "showactive": False,
             "x": 0.05,       
-            "y": 0.12, # Adjusted up slightly to fit timeline safely underneath
+            "y": 0.12, 
             "xanchor": "left",
             "yanchor": "bottom",
             "pad": {"t": 10, "b": 10},
@@ -219,7 +213,7 @@ def build_animated_orbital_plot():
         title=dict(
             text="⏳ Elapsed: 0m 0s",
             x=0.05,
-            y=0.04, # Anchored cleanly beneath the animation trigger boundary
+            y=0.04, 
             xanchor='left',
             yanchor='top',
             font=dict(color="rgba(255, 255, 255, 0.55)", size=12)
@@ -246,6 +240,7 @@ tab1, tab2 = st.tabs(["🚀 Live Telemetry", "🧠 RL Training Logs"])
 
 with tab1:
     if st.button("Initialize Autonomous Routing"):
+        st.session_state.routing_initialized = True
         with st.status("Simulating orbital paths...", expanded=True) as status:
             time.sleep(1)
             st.write("Predicting congestion windows...")
@@ -272,14 +267,22 @@ with tab1:
                 collision_array[i] += 1
                 collision_array[j] += 1
 
+    # Calculate proportional ASCENT fuel consumption if routing engine is initialized
+    if st.session_state.routing_initialized:
+        np.random.seed(24)
+        # Fuel burn base modifier scaled directly against the configured satellite mass slider
+        fuel_base_factor = np.random.uniform(0.002, 0.005, size=num_satellites)
+        fuel_usage = np.round(fuel_base_factor * sat_mass, 2)
+    else:
+        fuel_usage = np.zeros(num_satellites)
+
     np.random.seed(24)
-    fuel_usage = np.round(np.random.uniform(0.0, 3.5, size=num_satellites), 2)
     uptime_percentage = np.round(np.random.uniform(94.0, 99.9, size=num_satellites), 1)
     sat_labels = [f"Satellite {k}" for k in range(num_satellites)]
 
     telemetry_data = {
         "Collision Events": collision_array, 
-        "Fuel Usage (kg)": fuel_usage,  
+        "Fuel Usage [ASCENT] (kg)": fuel_usage,  
         "Uptime (%)": uptime_percentage     
     }
     
